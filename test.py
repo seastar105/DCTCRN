@@ -8,9 +8,7 @@ from torchaudio.functional import fftconvolve, resample
 from utils import make_noisy
 
 clean_files = glob.glob("datasets/clean/**/*.wav", recursive=True)
-rir_files = glob.glob(
-    "datasets/impulse_responses/SLR28/RIRS_NOISES/real_rirs_isotropic_noises/**/*.wav", recursive=True
-)
+rir_files = glob.glob("datasets/rir/**/*.wav", recursive=True)
 noise_files = glob.glob("datasets/noise/**/*.wav", recursive=True)
 
 clean_idx = np.random.randint(0, len(clean_files))
