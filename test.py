@@ -29,11 +29,11 @@ reverb_speech = fftconvolve(clean_speech, rir_speech, mode="full")
 reverb_speech = reverb_speech[:, : clean_speech.shape[1]]
 print(f"reverb_speech.shape: {reverb_speech.shape}")
 
-result = make_noisy(clean_speech, noise, (-10, 21))
+clean, noisy = make_noisy(clean_speech, noise, (-10, 21), (-35, -14))
 # result = reverb_speech
 
-wavwrite("clean.wav", 16000, clean_speech.squeeze().numpy().astype(np.float32))
-wavwrite("result.wav", 16000, result.squeeze().numpy().astype(np.float32))
+wavwrite("clean.wav", 16000, clean.squeeze().numpy().astype(np.float32))
+wavwrite("noisy.wav", 16000, noisy.squeeze().numpy().astype(np.float32))
 
 # import numpy as np
 # from utils import stdct, synthesize_wav

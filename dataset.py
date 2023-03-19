@@ -5,7 +5,7 @@ import numpy as np
 import torchaudio
 from torch.utils.data import Dataset
 
-from utils import make_noisy, make_reverb
+from utils import make_noisy
 
 
 class CleanNoisyDataset(Dataset):
@@ -15,18 +15,20 @@ class CleanNoisyDataset(Dataset):
         rir_dir: str,
         noisy_dir: str,
         target_sr: int = 16000,
-        snr_range: Tuple[int, int] = (-10, 20),
+        snr_range: Tuple[int, int] = (-10, 20 + 1),
+        db_range: Tuple[int, int] = (-35, -15 + 1),
     ):
         self.clean_dir = clean_dir
         self.rir_dir = rir_dir
         self.noisy_dir = noisy_dir
 
         self.clean_files = glob.glob(self.clean_dir + "/**/*.wav", recursive=True)
-        self.rir_files = glob(self.rir_dir + "/**/*.wav", recursive=True)
-        self.noisy_files = glob(self.noisy_dir + "/**/*.wav", recursive=True)
+        self.rir_files = glob.glob(self.rir_dir + "/**/*.wav", recursive=True)
+        self.noisy_files = glob.glob(self.noisy_dir + "/**/*.wav", recursive=True)
 
         self.target_sr = target_sr
         self.snr_range = snr_range
+        self.db_range = db_range
 
     def __len__(self):
         return len(self.clean_files)
@@ -45,14 +47,11 @@ class CleanNoisyDataset(Dataset):
         if sr != self.target_sr:
             noise = torchaudio.functional.resample(noise, sr, self.target_sr)
 
-        assert clean.shape[0] == 0, "clean speech should be mono"
-        assert noise.shape[0] == 0, "noise should be mono"
+        assert clean.shape[0] == 1, f"clean speech should be mono {clean.shape}"
+        assert noise.shape[0] == 1, "noise should be mono"
 
         rir_channels = rir.shape[0]
         if rir_channels > 1:
             rir = rir.mean(0, keepdim=True)
 
-        noisy = make_reverb(clean, rir)
-        noisy = make_noisy(noisy, noise, self.snr_range)
-
-        return clean, noisy
+        return make_noisy(clean, rir, noise, self.snr_range, self.db_range)
