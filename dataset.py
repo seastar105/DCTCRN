@@ -45,9 +45,12 @@ class CleanNoisyDataset(Dataset):
         if sr != self.target_sr:
             noise = torchaudio.functional.resample(noise, sr, self.target_sr)
 
-        clean = clean.squeeze()
-        rir = rir.squeeze()
-        noise = noise.squeeze()
+        assert clean.shape[0] == 0, "clean speech should be mono"
+        assert noise.shape[0] == 0, "noise should be mono"
+
+        rir_channels = rir.shape[0]
+        if rir_channels > 1:
+            rir = rir.mean(0, keepdim=True)
 
         noisy = make_reverb(clean, rir)
         noisy = make_noisy(noisy, noise, self.snr_range)

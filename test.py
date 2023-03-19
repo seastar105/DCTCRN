@@ -23,13 +23,41 @@ print(f"rir_speech.shape: {rir_speech.shape} {sr}")
 noise, sr = torchaudio.load(noise_files[noise_idx])
 print(f"noise.shape: {noise.shape} {sr}")
 
-rir_channel = np.random.randint(0, rir_speech.shape[0])
-rir_speech = rir_speech[rir_channel].unsqueeze(0)
+rir_speech = rir_speech.mean(0, keepdim=True)
+# rir_speech = rir_speech[0].unsqueeze(0)
 reverb_speech = fftconvolve(clean_speech, rir_speech, mode="full")
 reverb_speech = reverb_speech[:, : clean_speech.shape[1]]
 print(f"reverb_speech.shape: {reverb_speech.shape}")
 
-result = make_noisy(clean_speech, noise, (-10, -9))
+result = make_noisy(clean_speech, noise, (-10, 21))
+# result = reverb_speech
 
 wavwrite("clean.wav", 16000, clean_speech.squeeze().numpy().astype(np.float32))
 wavwrite("result.wav", 16000, result.squeeze().numpy().astype(np.float32))
+
+# import numpy as np
+# from utils import stdct, synthesize_wav
+# import torchaudio
+# import torch
+# from scipy.io.wavfile import write as wavwrite
+#
+# frame_length = 512
+# hop_length = 128
+#
+# y, sr = torchaudio.load("/home/seastar105/mb_original.wav")
+# if sr != 16000:
+#     y = torchaudio.functional.resample(y, sr, 16000)
+# print(y.shape)
+#
+# window = torch.hann_window(frame_length)
+# stft = torch.stft(y, n_fft=frame_length, hop_length=hop_length, onesided=False, return_complex=True)
+# print(stft.shape)
+# dct = stdct(y, frame_length, hop_length, window=torch.hamming_window(frame_length))
+# print(dct.shape)
+#
+# stft_recon = torch.istft(stft, n_fft=frame_length, hop_length=hop_length, onesided=False)
+# print(stft_recon.shape)
+# wavwrite('stft_recon.wav', 16000, stft_recon.squeeze().numpy().astype(np.float32))
+# stdct_recon = synthesize_wav(dct, frame_length, hop_length)
+# print(stdct_recon.shape)
+# wavwrite('stdct_recon.wav', 16000, stdct_recon.squeeze().numpy().astype(np.float32))
