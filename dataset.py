@@ -2,9 +2,11 @@ import glob
 from typing import Tuple
 
 import numpy as np
+import torch
 import torchaudio
 from torch.utils.data import Dataset
 
+from config import SLICE_LEN, STRIDE
 from utils import make_noisy
 
 
@@ -30,20 +32,28 @@ class CleanNoisyDataset(Dataset):
         self.snr_range = snr_range
         self.db_range = db_range
 
+        # shuffle clean files
+        np.random.shuffle(self.clean_files)
+
     def __len__(self):
         return len(self.clean_files)
 
     def __getitem__(self, index):
         clean_file = self.clean_files[index]
         rir_idx = np.random.randint(0, len(self.rir_files))
+        noise_idx = np.random.randint(0, len(self.noisy_files))
 
         clean, sr = torchaudio.load(clean_file)
         if sr != self.target_sr:
             clean = torchaudio.functional.resample(clean, sr, self.target_sr)
+        from scipy.io.wavfile import write
+
+        print(f"clean.max() = {clean.max()}")
+        write("full_clean.wav", self.target_sr, clean.squeeze().numpy())
         rir, sr = torchaudio.load(self.rir_files[rir_idx])
         if sr != self.target_sr:
             rir = torchaudio.functional.resample(rir, sr, self.target_sr)
-        noise, sr = torchaudio.load(self.noisy_files[index])
+        noise, sr = torchaudio.load(self.noisy_files[noise_idx])
         if sr != self.target_sr:
             noise = torchaudio.functional.resample(noise, sr, self.target_sr)
 
@@ -54,4 +64,26 @@ class CleanNoisyDataset(Dataset):
         if rir_channels > 1:
             rir = rir.mean(0, keepdim=True)
 
-        return make_noisy(clean, rir, noise, self.snr_range, self.db_range)
+        return make_noisy(clean, rir, noise, self.snr_range, self.db_range, -10)
+
+
+def create_chunks(audio: torch.Tensor, frame_length: int, hop_length: int):
+    chunks = audio.unfold(-1, frame_length, hop_length)
+    if audio.shape[-1] > chunks.shape[0] * chunks.shape[1]:
+        chunks = torch.cat([chunks, audio[..., -frame_length:]], dim=-1)
+    return chunks
+
+
+def collate_fn(batch):
+    clean_wavs = []
+    noisy_wavs = []
+    for i, (clean, noisy) in enumerate(batch):
+        from scipy.io.wavfile import write as wavwrite
+
+        wavwrite(f"clean_full_{i}.wav", 16000, clean.squeeze().numpy())
+        clean_chunks = create_chunks(clean, SLICE_LEN, STRIDE)
+        clean_wavs.append(clean_chunks)
+        noisy_chunks = create_chunks(noisy, SLICE_LEN, STRIDE)
+        noisy_wavs.append(noisy_chunks)
+        print(f"batch {i} clean {clean_chunks.shape} noisy {noisy_chunks.shape}")
+    return (torch.vstack(clean_wavs), torch.vstack(noisy_wavs))

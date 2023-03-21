@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 import numpy as np
 import torch
 import torch_dct
+import torchaudio.functional
 from torchaudio.functional import fftconvolve
 
 EPS = np.finfo(np.float32).eps
@@ -28,9 +29,9 @@ def make_noisy(
     snr_range: Tuple[int, int],
     db_range: Tuple[int, int],
     target_level: int = -25,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     # reference:
-    # https://github.com/microsoft/DNS-Challenge/blob/a2c7487e12d06d709aeebe5659c21bbf6e1a47aa/audiolib.py#L155
+    # https://github.com/microsoft/DNS-Challenge/blob/a2c7487e12d06d709aeebe5659c21bbf6e1a47aa/audiolib.py#L111
     snr = np.random.randint(snr_range[0], snr_range[1])
     if clean.shape[1] > noise.shape[1]:
         noise = torch.nn.functional.pad(noise, (0, clean.shape[1] - noise.shape[1]))
@@ -49,8 +50,13 @@ def make_noisy(
     noise = normalize(noise, target_level)
     rms_noise = (noise**2).mean() ** 0.5
 
+    print(f"rms_reverb: {rms_reverb}")
+    print(f"rms_noise: {rms_noise}")
+    torchaudio.functional.add_noise()
+
     # Set the noise level for a given SNR
     noise_scaler = rms_reverb / (rms_noise + EPS) / (10 ** (snr / 20.0))
+    print(f"noise_scaler: {noise_scaler}")
     noise = noise * noise_scaler
 
     noisy = reverb + noise
@@ -60,9 +66,8 @@ def make_noisy(
     noisy_scaler = 10 ** (noisy_target_level / 20) / (rms_noisy + EPS)
     clean = clean * noisy_scaler
     noisy = noisy * noisy_scaler
-    noise = noise * noisy_scaler
 
-    return clean.squeeze(), noisy.squeeze(), noise.squeeze()
+    return clean.squeeze(), noisy.squeeze()
 
 
 def frame(
@@ -86,12 +91,18 @@ def synthesize_wav(
     dct: torch.Tensor, frame_length: int, hop_length: int, window: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
     framed = dct.permute(0, 2, 1)
-    istdct = torch_dct.idct(framed, norm="ortho")
-    # overlap and add
-    signal = torch.zeros(istdct.shape[0], istdct.shape[1] * hop_length + frame_length - hop_length)
+    recon = torch_dct.idct(framed, norm="ortho")
     if window is not None:
-        istdct *= window
-    for i in range(istdct.shape[1]):
-        signal[:, i * hop_length : i * hop_length + frame_length] += istdct[:, i, :]
+        recon *= window
+    print(f"recon.shape: {recon.shape}")
+    # overlap and add
+    signal = torch.zeros(recon.shape[0], recon.shape[1] * hop_length + frame_length - hop_length)
+    overlap = torch.zeros(recon.shape[0], recon.shape[1] * hop_length + frame_length - hop_length)
+    for i in range(recon.shape[1]):
+        signal[:, i * hop_length : i * hop_length + frame_length] += recon[:, i, :]
+        overlap[:, i * hop_length : i * hop_length + frame_length] += window
+    print(f"signal.max(): {signal.max()}")
+    print(f"overlap.max(): {overlap.max()}")
     # I'm not sure if this is correct, but reconstructed wave form wat too loud not applying this.
-    return signal / signal.abs().max()
+    # return signal / signal.abs().max()
+    return signal
