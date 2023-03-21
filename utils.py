@@ -89,9 +89,10 @@ def synthesize_wav(
     istdct = torch_dct.idct(framed, norm="ortho")
     # overlap and add
     signal = torch.zeros(istdct.shape[0], istdct.shape[1] * hop_length + frame_length - hop_length)
-    if window is not None:
-        istdct *= window
+    overlap = torch.zeros(istdct.shape[0], istdct.shape[1] * hop_length + frame_length - hop_length)
     for i in range(istdct.shape[1]):
         signal[:, i * hop_length : i * hop_length + frame_length] += istdct[:, i, :]
     # I'm not sure if this is correct, but reconstructed wave form wat too loud not applying this.
-    return signal / signal.abs().max()
+    print(f"signal.max = {signal.max()}")
+    print(f"overlap.max = {overlap.max()}")
+    return signal
