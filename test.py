@@ -40,25 +40,27 @@ import torch
 import torchaudio
 from scipy.io.wavfile import write as wavwrite
 
-from utils import stdct, synthesize_wav
+from utils import stdct, istdct
 
 frame_length = 512
 hop_length = 128
 
-y, sr = torchaudio.load("datasets/clean_trainset_28spk_wav/p278_195.wav")
+y, sr = torchaudio.load("clean.wav")
 if sr != 16000:
     y = torchaudio.functional.resample(y, sr, 16000)
 print(y.shape)
+print(y.max())
 
 window = torch.hann_window(frame_length)
 stft = torch.stft(y, n_fft=frame_length, hop_length=hop_length, onesided=False, return_complex=True)
 print(stft.shape)
-dct = stdct(y, frame_length, hop_length, window=torch.hann_window(frame_length))
+dct = stdct(y, frame_length, hop_length, window=window)
 print(dct.shape)
+print(dct.max())
 
 stft_recon = torch.istft(stft, n_fft=frame_length, hop_length=hop_length, onesided=False)
 print(stft_recon.shape)
 wavwrite("stft_recon.wav", 16000, stft_recon.squeeze().numpy().astype(np.float32))
-stdct_recon = synthesize_wav(dct, frame_length, hop_length, window=torch.hann_window(frame_length))
+stdct_recon = istdct(dct, frame_length, hop_length, window=window)
 print(stdct_recon.shape)
 wavwrite("stdct_recon.wav", 16000, stdct_recon.squeeze().numpy().astype(np.float32))

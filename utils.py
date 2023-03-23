@@ -68,31 +68,29 @@ def make_noisy(
 def frame(
     signal: torch.Tensor, frame_length: int, hop_length: int, window: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
-    framed = signal.unfold(-1, frame_length, hop_length)
+    frames = signal.unfold(-1, frame_length, hop_length)
     if window is not None:
-        framed *= window
-    return framed
+        frames = frames * window
+    return frames
 
 
 def stdct(
     signal: torch.Tensor, frame_length: int, hop_length: int, window: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
-    framed = frame(signal, frame_length, hop_length, window=window)
-    dct = torch_dct.dct(framed, norm="ortho")
-    return dct.permute(0, 2, 1)
+    frames = frame(signal, frame_length, hop_length, window)
+    return torch_dct.dct(frames, norm='ortho')
 
 
-def synthesize_wav(
-    dct: torch.Tensor, frame_length: int, hop_length: int, window: Optional[torch.Tensor] = None
-) -> torch.Tensor:
-    framed = dct.permute(0, 2, 1)
-    istdct = torch_dct.idct(framed, norm="ortho")
-    # overlap and add
-    signal = torch.zeros(istdct.shape[0], istdct.shape[1] * hop_length + frame_length - hop_length)
-    overlap = torch.zeros(istdct.shape[0], istdct.shape[1] * hop_length + frame_length - hop_length)
-    for i in range(istdct.shape[1]):
-        signal[:, i * hop_length : i * hop_length + frame_length] += istdct[:, i, :]
-    # I'm not sure if this is correct, but reconstructed wave form wat too loud not applying this.
-    print(f"signal.max = {signal.max()}")
-    print(f"overlap.max = {overlap.max()}")
-    return signal
+def istdct(dct, frame_length, hop_length, window=None):
+    frames = torch_dct.idct(dct, norm='ortho').squeeze(1)
+    num_frames = frames.shape[-2]
+    audio = torch.zeros((frames.shape[0], num_frames * hop_length + frame_length - hop_length))
+    overlap = torch.zeros((frames.shape[0], num_frames * hop_length + frame_length - hop_length))
+    if window is None:
+        window = torch.ones((frame_length))
+    for i in range(num_frames):
+        audio[:, i * hop_length:i * hop_length + frame_length] += frames[:, i, :]
+        overlap[:, i * hop_length:i * hop_length + frame_length] += window
+    overlap = overlap.clamp(min=1e-8)
+    audio /= overlap
+    return audio
