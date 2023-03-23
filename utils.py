@@ -78,19 +78,19 @@ def stdct(
     signal: torch.Tensor, frame_length: int, hop_length: int, window: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
     frames = frame(signal, frame_length, hop_length, window)
-    return torch_dct.dct(frames, norm='ortho')
+    return torch_dct.dct(frames, norm="ortho")
 
 
 def istdct(dct, frame_length, hop_length, window=None):
-    frames = torch_dct.idct(dct, norm='ortho').squeeze(1)
+    frames = torch_dct.idct(dct, norm="ortho").squeeze(1)
     num_frames = frames.shape[-2]
     audio = torch.zeros((frames.shape[0], num_frames * hop_length + frame_length - hop_length))
     overlap = torch.zeros((frames.shape[0], num_frames * hop_length + frame_length - hop_length))
     if window is None:
-        window = torch.ones((frame_length))
+        window = torch.ones(frame_length)
     for i in range(num_frames):
-        audio[:, i * hop_length:i * hop_length + frame_length] += frames[:, i, :]
-        overlap[:, i * hop_length:i * hop_length + frame_length] += window
+        audio[:, i * hop_length : i * hop_length + frame_length] += frames[:, i, :]
+        overlap[:, i * hop_length : i * hop_length + frame_length] += window
     overlap = overlap.clamp(min=1e-8)
     audio /= overlap
     return audio
