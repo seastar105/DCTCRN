@@ -6,7 +6,7 @@ import torch
 import torchaudio
 from torch.utils.data import Dataset
 
-from config import SLICE_LEN, STRIDE
+from config import MAX_BATCH_SIZE, SLICE_LEN, STRIDE
 from utils import frame
 
 
@@ -39,18 +39,29 @@ class CleanNoisyDataset(Dataset):
             noisy = torchaudio.functional.resample(noisy, sr, self.target_sr)
         assert clean.shape[0] == 1, f"clean speech should be mono {clean.shape}"
         assert clean.shape == noisy.shape, f"clean and noisy should have same shape {clean.shape} {noisy.shape}"
-        print(clean_file, noisy_file, clean.shape, noisy.shape)
-        print(f"clean.max(): {clean.max()}")
-        print(f"noisy.max(): {noisy.max()}")
-        return clean.squeeze(), noisy.squeeze()
+        return clean, noisy
+
+
+def create_chunks(wav):
+    # wav: (1, L)
+    # chunks: (N, 1, SLICE_LEN)
+    chunks = frame(wav, frame_length=SLICE_LEN, hop_length=STRIDE).permute(1, 0, 2)
+    if wav.shape[-1] > (chunks.shape[0] - 1) * STRIDE + SLICE_LEN:
+        last_chunk = wav[:, -SLICE_LEN:].unsqueeze(1)
+        chunks = torch.vstack([chunks, last_chunk])
+    return chunks
 
 
 def collate_fn(batch):
     clean_wavs = []
     noisy_wavs = []
     for clean, noisy in batch:
-        clean_chunks = frame(clean, SLICE_LEN, STRIDE)
-        noisy_chunks = frame(noisy, SLICE_LEN, STRIDE)
+        clean_chunks = create_chunks(clean)
+        noisy_chunks = create_chunks(noisy)
         clean_wavs.append(clean_chunks)
         noisy_wavs.append(noisy_chunks)
-    return (torch.vstack(clean_wavs), torch.vstack(noisy_wavs))
+    clean, noisy = torch.vstack(clean_wavs), torch.vstack(noisy_wavs)
+    if clean.shape[0] > MAX_BATCH_SIZE:
+        clean = clean[:MAX_BATCH_SIZE]
+        noisy = noisy[:MAX_BATCH_SIZE]
+    return clean, noisy
