@@ -20,7 +20,7 @@ def si_snr(clean, estimated):
     )
     target_scaled = alpha * clean
 
-    noise = target_scaled - clean
+    noise = target_scaled - estimated
 
     val = (torch.sum(target_scaled**2, dim=-1) + eps) / (torch.sum(noise**2, dim=-1) + eps)
     val = 10 * torch.log10(val)
