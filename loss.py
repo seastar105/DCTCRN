@@ -28,7 +28,8 @@ def si_snr(clean, estimated):
 
 
 def si_snr_loss(clean, estimated):
-    return -si_snr(clean, estimated)
+    result = -si_snr(clean, estimated)
+    return result.mean()
 
 
 if __name__ == "__main__":

@@ -1,13 +1,15 @@
 # dataset directories
-clean_dir = "datasets/clean_trainset_28spk_wav"
-noisy_dir = "datasets/noisy_trainset_28spk_wav"
+raw_clean_dir = "datasets/clean_trainset_28spk_wav"
+raw_noisy_dir = "datasets/noisy_trainset_28spk_wav"
+clean_dir = "datasets/clean"
+noisy_dir = "datasets/noisy"
 rir_dir = "datasets/rir"
 noise_dir = "datasets/noise"
 
 # dataset parameters
 snr_range = (-10, 20 + 1)
 db_range = (-35, -15 + 1)
-target_sr = 16384
+target_sr = 16000
 
 SLICE_LEN = 16384  # 1 second
 STRIDE = SLICE_LEN // 2  # 50% overlap
@@ -15,8 +17,7 @@ FRAME_LEN = 512
 HOP_LEN = 128
 
 SEED = 998244353
-FILE_NUMS = 8
-MAX_BATCH_SIZE = 64
+BATCH_SIZE = 64
 EPOCHS = 300
 LEARNING_RATE = 0.001
 encoder_channels = [1, 8, 16, 32, 64, 128, 128, 256]

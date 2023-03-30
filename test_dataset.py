@@ -4,18 +4,21 @@ from scipy.io.wavfile import write as wavwrite
 from torch.utils.data import DataLoader
 
 from config import clean_dir, noisy_dir, target_sr
-from dataset import CleanNoisyDataset
-from utils import stdct, synthesize_wav
+from dataset import CleanNoisyDataset, collate_fn
+from utils import stdct, istdct
 
 dataset = CleanNoisyDataset(clean_dir=clean_dir, noisy_dir=noisy_dir, target_sr=target_sr)
 
 
-dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
+dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=0, collate_fn=collate_fn)
 frame_len = 512
 hop_len = 128
 window = torch.hamming_window(frame_len)
 
 for clean, noisy in dataloader:
+    print(clean.shape)
+    print(noisy.shape)
+    break
     clean_dct = stdct(clean, frame_len, hop_len, window=window)
     noisy_dct = stdct(noisy, frame_len, hop_len, window=window)
     clean_stft = torch.stft(clean, n_fft=frame_len, hop_length=hop_len, return_complex=True)
