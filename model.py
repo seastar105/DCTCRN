@@ -138,7 +138,7 @@ class CRN(nn.Module):
                 nn.init.zeros_(module.bias.data)
 
     @torch.inference_mode()
-    def inference(self, file_path: str, device="cuda") -> torch.Tensor:
+    def inference(self, file_path: str, device="cuda", normalize=False) -> torch.Tensor:
         audio, sr = torchaudio.load(file_path)
         if sr != 16000:
             audio = torchaudio.functional.resample(audio, sr, 16000)
@@ -164,4 +164,6 @@ class CRN(nn.Module):
             clean[:, -SLICE_LEN:] += recon[-1]
             overlap[:, -SLICE_LEN:] += window
         clean = clean / overlap
+        if normalize:
+            clean = clean / torch.max(torch.abs(clean))
         return clean
