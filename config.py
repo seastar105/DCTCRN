@@ -5,6 +5,8 @@ clean_dir = "datasets/clean"
 noisy_dir = "datasets/noisy"
 rir_dir = "datasets/rir"
 noise_dir = "datasets/noise"
+test_clean_dir = "datasets/clean_testset_wav"
+test_noisy_dir = "datasets/noisy_testset_wav"
 
 # dataset parameters
 snr_range = (-10, 20 + 1)

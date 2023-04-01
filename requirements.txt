@@ -8,3 +8,5 @@ ipykernel
 jupyter
 librosa
 scipy
+pesq
+pystoi
