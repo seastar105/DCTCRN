@@ -56,10 +56,10 @@ def collate_fn(batch):
     clean_wavs = []
     noisy_wavs = []
     for clean, noisy in batch:
-        clean_chunks = create_chunks(clean)
-        noisy_chunks = create_chunks(noisy)
-        clean_wavs.append(clean_chunks)
-        noisy_wavs.append(noisy_chunks)
+        clean = create_chunks(clean)
+        noisy = create_chunks(noisy)
+        clean_wavs.append(clean)
+        noisy_wavs.append(noisy)
     clean, noisy = torch.vstack(clean_wavs), torch.vstack(noisy_wavs)
     if clean.shape[0] > MAX_BATCH_SIZE:
         clean = clean[:MAX_BATCH_SIZE]
