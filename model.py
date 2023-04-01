@@ -84,6 +84,7 @@ class Processor(nn.Module):
     def __init__(self, hidden_dim: int = 256):
         super(Processor, self).__init__()
         self.lstm = nn.LSTM(hidden_dim, hidden_dim, 2, batch_first=True)
+        self.lstm.flatten_parameters()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x, _ = self.lstm(x)
@@ -120,11 +121,11 @@ class CRN(nn.Module):
     @staticmethod
     def _init_weights(module):
         if isinstance(module, nn.Conv2d):
-            nn.init.kaiming_normal_(module.weight.data)
+            nn.init.kaiming_normal_(module.weight.data, mode="fan_out", nonlinearity="relu")
             if module.bias is not None:
                 nn.init.zeros_(module.bias.data)
         elif isinstance(module, nn.ConvTranspose2d):
-            nn.init.kaiming_normal_(module.weight.data)
+            nn.init.kaiming_normal_(module.weight.data, mode="fan_out", nonlinearity="relu")
             if module.bias is not None:
                 nn.init.zeros_(module.bias.data)
         elif isinstance(module, nn.BatchNorm2d):
@@ -163,4 +164,4 @@ class CRN(nn.Module):
             clean[:, -SLICE_LEN:] += recon[-1]
             overlap[:, -SLICE_LEN:] += window
         clean = clean / overlap
-        return clean / (torch.max(torch.abs(clean)) + 1e-8)
+        return clean

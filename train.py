@@ -9,17 +9,16 @@ import wandb
 from config import (
     CHECKPOINT_PATH,
     EPOCHS,
-    BATCH_SIZE,
     FRAME_LEN,
     HOP_LEN,
     LEARNING_RATE,
     SEED,
-    clean_dir,
     decoder_channels,
     encoder_channels,
     kernel_size,
-    noisy_dir,
     padding,
+    raw_clean_dir,
+    raw_noisy_dir,
     stride,
     target_sr,
 )
@@ -27,13 +26,11 @@ from dataset import CleanNoisyDataset, collate_fn
 from loss import si_snr_loss
 from model import CRN
 from utils import istdct, stdct
-import os
 
 
 def predefines():
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
-    torch.backends.cudnn.benchmark = False
 
     # seed
     torch.manual_seed(SEED)
@@ -65,7 +62,7 @@ def train_loop(model, loader, optimizer, global_step, device="cuda"):
             train_loss = sum(losses) / len(losses)
             print(f"Step: {global_step}, Loss: {train_loss}, Time: {elapsed} sec")
             wandb.log(
-                {"train/loss": train_loss, "train/step_time": elapsed, "train/steps": global_step},
+                {"train/loss": train_loss, "train/step_time": elapsed, "train/steps": global_step}, step=global_step
             )
             losses = []
     return global_step
@@ -90,16 +87,14 @@ def val_loop(model, loader, infer_file, epoch, device="cuda"):
             audio.cpu().squeeze().numpy().astype(np.float32), sample_rate=16000, caption="Inference"
         )
         print(f"Val Loss: {val_loss}")
-        wandb.log({"val/loss": val_loss, "val/sample": log_audio, "epoch": epoch})
+        wandb.log({"val/loss": val_loss, "val/sample": log_audio, "epoch": epoch}, step=epoch)
     return val_loss
 
 
 if __name__ == "__main__":
     predefines()
     wandb.init(project="dctcrn", name="dctcrn-t-voicebank")
-    wandb.config.update(
-        {"bacth_size": BATCH_SIZE, "epochs": EPOCHS, "dataset": "voicebank", "seed": SEED}, allow_val_change=True
-    )
+    wandb.config.update({"file_num": 8, "epochs": EPOCHS, "dataset": "voicebank", "seed": SEED}, allow_val_change=True)
     if not torch.cuda.is_available():
         assert False, "CUDA is not available"
     device = "cuda"
@@ -121,37 +116,31 @@ if __name__ == "__main__":
             for k, v in state.items():
                 if torch.is_tensor(v):
                     state[k] = v.to(device)
-    train_clean_dir = os.path.join(clean_dir, "train")
-    train_noisy_dir = os.path.join(noisy_dir, "train")
-    train_ds = CleanNoisyDataset(train_clean_dir, train_noisy_dir, target_sr)
-    val_clean_dir = os.path.join(clean_dir, "val")
-    val_noisy_dir = os.path.join(noisy_dir, "val")
-    val_ds = CleanNoisyDataset(val_clean_dir, val_noisy_dir, target_sr)
+    ds = CleanNoisyDataset(raw_clean_dir, raw_noisy_dir, target_sr)
+    train_size = int(0.9 * len(ds))
+    val_size = len(ds) - train_size
+    train_ds, val_ds = torch.utils.data.random_split(ds, [train_size, val_size])
 
     train_loader = torch.utils.data.DataLoader(
-        train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=4,
+        train_ds, batch_size=8, shuffle=True, num_workers=4, collate_fn=collate_fn
     )
-    val_loader = torch.utils.data.DataLoader(
-        val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=4,
-    )
+    val_loader = torch.utils.data.DataLoader(val_ds, batch_size=8, shuffle=False, num_workers=4, collate_fn=collate_fn)
 
     model = model.to(device)
-    model = torch.compile(model)
-    for epoch in range(epoch, EPOCHS+1):
+    for epoch in range(epoch, EPOCHS + 1):
         epoch_start = time.time()
         global_step = train_loop(model, train_loader, optimizer, global_step, device)
         epoch_end = time.time()
         print(f"Epoch: {epoch}, Time: {epoch_end - epoch_start} sec")
-        wandb.log({"train/epoch_time": epoch_end - epoch_start, "epoch": epoch})
+        wandb.log({"train/epoch_time": epoch_end - epoch_start, "epoch": epoch}, step=global_step)
         epoch_start = time.time()
         val_loss = val_loop(model, val_loader, "noisy.wav", epoch, device)
         epoch_end = time.time()
         print(f"Validation: {epoch}, Loss: {val_loss} Time: {epoch_end - epoch_start} sec")
-        wandb.log({"val/epoch_time": epoch_end - epoch_start, "epoch": epoch})
+        wandb.log({"val/epoch_time": epoch_end - epoch_start, "epoch": epoch}, step=global_step)
         if epoch >= 100:
             scheduler.step(val_loss)
         # save model every epoch
-        torch.save(model.state_dict(), f"checkpoints/{epoch}.pth")
         torch.save(
             {
                 "epoch": epoch,
@@ -160,7 +149,7 @@ if __name__ == "__main__":
                 "scheduler_state_dict": scheduler.state_dict(),
                 "global_step": global_step,
             },
-            CHECKPOINT_PATH,
+            f"checkpoints/{epoch}.pth",
         )
         wandb.save(CHECKPOINT_PATH)
 

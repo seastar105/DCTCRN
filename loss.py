@@ -29,7 +29,7 @@ def si_snr(clean, estimated):
 
 def si_snr_loss(clean, estimated):
     result = -si_snr(clean, estimated)
-    return result.mean()
+    return result.sum() / result.numel()
 
 
 if __name__ == "__main__":

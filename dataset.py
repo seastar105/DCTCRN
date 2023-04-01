@@ -6,7 +6,7 @@ import torch
 import torchaudio
 from torch.utils.data import Dataset
 
-from config import SLICE_LEN, STRIDE
+from config import MAX_BATCH_SIZE, SLICE_LEN, STRIDE
 from utils import frame
 
 
@@ -56,7 +56,12 @@ def collate_fn(batch):
     clean_wavs = []
     noisy_wavs = []
     for clean, noisy in batch:
+        clean = create_chunks(clean)
+        noisy = create_chunks(noisy)
         clean_wavs.append(clean)
         noisy_wavs.append(noisy)
     clean, noisy = torch.vstack(clean_wavs), torch.vstack(noisy_wavs)
+    if clean.shape[0] > MAX_BATCH_SIZE:
+        clean = clean[:MAX_BATCH_SIZE]
+        noisy = noisy[:MAX_BATCH_SIZE]
     return clean, noisy
